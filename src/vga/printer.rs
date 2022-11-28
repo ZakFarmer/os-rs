@@ -1,6 +1,7 @@
 use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
+use x86_64::instructions::interrupts;
 
 use super::{
     colour::{Colour, ColourCode},
@@ -12,7 +13,7 @@ lazy_static! {
     pub static ref PRINTER: Mutex<Printer> = Mutex::new(Printer {
         cursor_x: 0,
         cursor_y: 0,
-        colour_code: ColourCode::new(Colour::Yellow, Colour::Black),
+        colour_code: ColourCode::new(Colour::White, Colour::Black),
         char_buffer: unsafe { &mut *(0xb8000 as *mut CharBuffer) },
     });
 }
@@ -25,7 +26,36 @@ pub struct Printer {
 }
 
 impl Printer {
-    pub fn print_byte(&mut self, byte: u8) {
+    fn clear_row(&mut self, row: usize) -> () {
+        let blank = RenderedChar {
+            ascii_char: b' ',
+            colour_code: ColourCode::new(Colour::Yellow, Colour::Black),
+        };
+
+        for col in 0..BUFFER_WIDTH {
+            self.char_buffer.chars[row][col].write(blank);
+        }
+    }
+
+    fn new_line(&mut self) -> () {
+        for row in 1..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                let char = self.char_buffer.chars[row][col].read();
+                self.char_buffer.chars[row - 1][col].write(char);
+            }
+        }
+
+        self.clear_row(BUFFER_HEIGHT - 1);
+        self.cursor_x = 0;
+
+        self.cursor_y = if self.cursor_y > BUFFER_HEIGHT - 1 {
+            BUFFER_HEIGHT - 1
+        } else {
+            self.cursor_y + 1
+        };
+    }
+
+    pub fn print_byte(&mut self, byte: u8) -> () {
         match byte {
             b'\n' => self.new_line(),
             byte => {
@@ -36,47 +66,29 @@ impl Printer {
                 let row = BUFFER_HEIGHT - 1;
                 let col = self.cursor_x;
 
-                let colour_code = ColourCode::new(Colour::White, Colour::Black);
                 self.char_buffer.chars[row][col].write(RenderedChar {
                     ascii_char: byte,
-                    colour_code,
+                    colour_code: self.colour_code,
                 });
+
                 self.cursor_x += 1;
             }
         }
     }
 
-    pub fn print_string(&mut self, string: &str) {
+    pub fn print_string(&mut self, string: &str) -> () {
         for byte in string.bytes() {
             match byte {
-                // Printable ASCII
+                // Valid printable ASCII range
                 0x20..=0x7e | b'\n' => self.print_byte(byte),
+                // Not part of printable ASCII range, display ASCII 0xfe (■)
                 _ => self.print_byte(0xfe),
             }
         }
     }
 
-    fn new_line(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let char = self.char_buffer.chars[row][col].read();
-                self.char_buffer.chars[row - 1][col].write(char);
-            }
-        }
-
-        self.clear_row(BUFFER_HEIGHT - 1);
-        self.cursor_x = 0;
-    }
-
-    fn clear_row(&mut self, row: usize) {
-        let blank = RenderedChar {
-            ascii_char: b' ',
-            colour_code: ColourCode::new(Colour::Yellow, Colour::Black),
-        };
-
-        for col in 0..BUFFER_WIDTH {
-            self.char_buffer.chars[row][col].write(blank);
-        }
+    pub fn set_colour_code(&mut self, colour_code: ColourCode) -> () {
+        self.colour_code = colour_code;
     }
 }
 
@@ -102,7 +114,10 @@ macro_rules! println {
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
-    PRINTER.lock().write_fmt(args).unwrap();
+
+    interrupts::without_interrupts(|| {
+        PRINTER.lock().write_fmt(args).unwrap();
+    });
 }
 
 #[test_case]
