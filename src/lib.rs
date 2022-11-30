@@ -6,29 +6,25 @@
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-pub mod gdt;
-pub mod idt;
-mod qemu;
-mod serial;
-mod test;
-pub mod vga;
+pub mod core;
+pub mod qemu;
 
-use core::panic::PanicInfo;
+use ::core::panic::PanicInfo;
 
-use x86_64::instructions::{interrupts, hlt};
+use x86_64::instructions::{hlt, interrupts};
 
 use crate::qemu::exit_qemu;
 
 // Main initialisation function
 pub fn init() {
     // Initialise the GDT (Global Descriptor Table)
-    gdt::init();
+    core::gdt::init();
 
     // Initialise the IDT (Interrupt Descriptor Table)
-    idt::init();
+    core::idt::init();
 
     unsafe {
-        idt::PICS.lock().initialize();
+        core::idt::PICS.lock().initialize();
     }
 
     // Enable interrupts
@@ -44,7 +40,7 @@ where
     T: Fn(),
 {
     fn run(&self) {
-        serial_print!("{}...\t", core::any::type_name::<T>());
+        serial_print!("{}...\t", ::core::any::type_name::<T>());
         self();
         serial_println!("[OK]");
     }

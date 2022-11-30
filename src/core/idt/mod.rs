@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use pic8259::ChainedPics;
 use x86_64::structures::idt::InterruptDescriptorTable;
 
-use crate::gdt::DOUBLE_FAULT_STACK_INDEX;
+use crate::core::gdt::DOUBLE_FAULT_STACK_INDEX;
 
 mod handlers;
 

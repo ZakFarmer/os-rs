@@ -7,7 +7,7 @@
 
 use core::panic::PanicInfo;
 
-use rs_os::{idt, println, print};
+use rs_os::{core::idt, print, println};
 use x86_64::instructions::hlt;
 
 // Define entry point
@@ -25,16 +25,8 @@ pub extern "C" fn _start() -> ! {
     rs_os::hlt_loop();
 }
 
-#[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    println!("{}", info);
-    
+    rs_os::test_panic_handler(info);
     rs_os::hlt_loop();
-}
-
-#[cfg(test)]
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    rs_os::test_panic_handler(info)
 }

@@ -102,7 +102,7 @@ impl fmt::Write for Printer {
 // Define custom macros for printing to the screen
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::vga::printer::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => ($crate::core::vga::printer::_print(format_args!($($arg)*)));
 }
 
 #[macro_export]

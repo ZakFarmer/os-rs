@@ -1,7 +1,7 @@
 use lazy_static::lazy_static;
 use x86_64::{structures::tss::TaskStateSegment, VirtAddr};
 
-use crate::gdt::DOUBLE_FAULT_STACK_INDEX;
+use crate::core::gdt::DOUBLE_FAULT_STACK_INDEX;
 
 lazy_static! {
     pub static ref TSS: TaskStateSegment = {
